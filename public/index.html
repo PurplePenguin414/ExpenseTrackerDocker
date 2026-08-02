@@ -100,7 +100,7 @@
     <div class="summary-grid">
       <div class="metric"><div class="metric-label">Income</div><div class="metric-value v-green" id="m-income">$0</div></div>
       <div class="metric"><div class="metric-label">Expenses</div><div class="metric-value v-red" id="m-expenses">$0</div></div>
-      <div class="metric"><div class="metric-label">Mileage Deduction</div><div class="metric-value v-green" id="m-mileage">$0</div></div>
+      <div class="metric"><div class="metric-label">Mileage Deduction <span id="m-rate" style="text-transform:none;font-weight:400;">(@ $0.00/mi)</span></div><div class="metric-value v-green" id="m-mileage">$0</div></div>
       <div class="metric"><div class="metric-label">Net Profit</div><div class="metric-value" id="m-profit">$0</div></div>
     </div>
     <hr style="border:none;border-top:1px solid var(--border);margin:18px 0;">
@@ -111,6 +111,7 @@
       <div class="metric"><div class="metric-label">Total Estimated Tax</div><div class="metric-value v-amber" id="m-total">$0</div></div>
     </div>
     <div id="quarterlyBanner" class="quarterly-banner"></div>
+    <div id="ratesUsed" style="margin-top:10px;font-size:11px;color:var(--muted);"></div>
   </div>
 
   <div class="card">
@@ -209,6 +210,9 @@ async function loadSummary() {
   document.getElementById('m-income').textContent = fmtMoney(s.income);
   document.getElementById('m-expenses').textContent = fmtMoney(s.expenses);
   document.getElementById('m-mileage').textContent = fmtMoney(s.mileageDeduction);
+  document.getElementById('m-rate').textContent = `(@ $${s.rates.mileageRate.toFixed(2)}/mi)`;
+  document.getElementById('ratesUsed').textContent =
+    `Rates used: Mileage $${s.rates.mileageRate.toFixed(2)}/mi · SE tax ${(s.rates.seTaxRate*100).toFixed(1)}% · Federal ${(s.rates.federalRate*100).toFixed(1)}% · Michigan ${(s.rates.stateRate*100).toFixed(2)}%`;
   document.getElementById('m-profit').textContent = fmtMoney(s.netProfit);
   document.getElementById('m-se').textContent = fmtMoney(s.seTax);
   document.getElementById('m-fed').textContent = fmtMoney(s.federalTax);
