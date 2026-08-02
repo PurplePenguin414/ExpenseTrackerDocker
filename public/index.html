@@ -177,6 +177,7 @@
 const typeSelect = document.getElementById('type');
 const amountField = document.getElementById('amountField');
 const milesField = document.getElementById('milesField');
+let currentMileageRate = 0;
 
 typeSelect.addEventListener('change', () => {
   if (typeSelect.value === 'mileage') {
@@ -207,6 +208,7 @@ async function loadSummary() {
   const year = document.getElementById('yearFilter').value;
   const res = await fetch('/api/summary' + (year ? `?year=${year}` : ''));
   const s = await res.json();
+  currentMileageRate = s.rates.mileageRate;
   document.getElementById('m-income').textContent = fmtMoney(s.income);
   document.getElementById('m-expenses').textContent = fmtMoney(s.expenses);
   document.getElementById('m-mileage').textContent = fmtMoney(s.mileageDeduction);
@@ -245,7 +247,7 @@ async function loadEntries() {
       <td>${e.entry_date}</td>
       <td><span class="tag tag-${e.type}">${e.type}</span></td>
       <td>${e.description || ''}${e.category ? ' <span style="color:#999;">· ' + e.category + '</span>' : ''}</td>
-      <td>${e.type === 'mileage' ? '—' : fmtMoney(e.amount)}</td>
+      <td>${e.type === 'mileage' ? fmtMoney(e.miles * currentMileageRate) : fmtMoney(e.amount)}</td>
       <td>${e.type === 'mileage' ? e.miles : '—'}</td>
       <td>${e.receipt_path ? `<a class="receipt-link" href="${e.receipt_path}" target="_blank">View</a>` : ''}</td>
       <td><button class="del-btn" onclick="deleteEntry(${e.id})">✕</button></td>
@@ -256,8 +258,7 @@ async function loadEntries() {
 async function deleteEntry(id) {
   if (!confirm('Delete this entry?')) return;
   await fetch('/api/entries/' + id, { method: 'DELETE' });
-  loadEntries();
-  loadSummary();
+  loadSummary().then(loadEntries);
 }
 
 document.getElementById('yearFilter').addEventListener('change', loadSummary);
@@ -288,13 +289,11 @@ document.getElementById('entryForm').addEventListener('submit', async (e) => {
   document.getElementById('entryForm').reset();
   amountField.style.display = 'block';
   milesField.style.display = 'none';
-  loadEntries();
-  loadSummary();
+  loadSummary().then(loadEntries);
 });
 
 checkAuth();
-loadEntries();
-loadSummary();
+loadSummary().then(loadEntries);
 </script>
 </body>
 </html>
