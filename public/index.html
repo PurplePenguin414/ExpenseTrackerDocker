@@ -74,6 +74,11 @@
   .del-btn { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 13px; }
   .del-btn:hover { color: var(--red); }
   select#yearFilter { padding: 6px 10px; border-radius: 8px; border: 1px solid var(--border); font-size: 13px; }
+  .export-btn {
+    background: white; border: 1px solid var(--border); border-radius: 8px;
+    padding: 7px 12px; font-size: 13px; cursor: pointer; color: var(--text);
+  }
+  .export-btn:hover { background: #f2f0eb; }
 </style>
 </head>
 <body>
@@ -84,9 +89,13 @@
   </header>
 
   <div class="card">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
       <h2 style="margin:0;">Tax Estimate</h2>
-      <select id="yearFilter"></select>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <select id="yearFilter"></select>
+        <button id="exportTransactionsBtn" class="export-btn">📄 Export Report</button>
+        <button id="exportReceiptsBtn" class="export-btn">🧾 Export Receipts</button>
+      </div>
     </div>
     <div class="summary-grid">
       <div class="metric"><div class="metric-label">Income</div><div class="metric-value v-green" id="m-income">$0</div></div>
@@ -220,7 +229,6 @@ async function loadEntries() {
   const res = await fetch('/api/entries');
   const entries = await res.json();
 
-  // Populate year filter
   const years = [...new Set(entries.map(e => e.entry_date.slice(0,4)))].sort().reverse();
   const yearFilter = document.getElementById('yearFilter');
   const currentVal = yearFilter.value;
@@ -249,6 +257,16 @@ async function deleteEntry(id) {
 }
 
 document.getElementById('yearFilter').addEventListener('change', loadSummary);
+
+document.getElementById('exportTransactionsBtn').addEventListener('click', () => {
+  const year = document.getElementById('yearFilter').value;
+  window.location.href = '/api/export/transactions' + (year ? `?year=${year}` : '');
+});
+
+document.getElementById('exportReceiptsBtn').addEventListener('click', () => {
+  const year = document.getElementById('yearFilter').value;
+  window.location.href = '/api/export/receipts' + (year ? `?year=${year}` : '');
+});
 
 document.getElementById('entryForm').addEventListener('submit', async (e) => {
   e.preventDefault();
