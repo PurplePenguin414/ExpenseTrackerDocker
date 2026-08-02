@@ -6,6 +6,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const Database = require('better-sqlite3');
+const PDFDocument = require('pdfkit');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -136,11 +137,8 @@ app.delete('/api/entries/:id', (req, res) => {
   res.json({ ok: true });
 });
 
-// ---- Tax summary route ----
-app.get('/api/summary', (req, res) => {
-  const { year } = req.query;
-  const yearFilter = year ? `WHERE entry_date LIKE '${year}%'` : '';
-
+// ---- Summary calculation helper (shared by /api/summary and PDF export) ----
+function computeSummary(year) {
   const income = db.prepare(`SELECT COALESCE(SUM(amount),0) as total FROM entries WHERE type = 'income' ${year ? `AND entry_date LIKE ?` : ''}`)
     .get(...(year ? [`${year}%`] : [])).total;
 
@@ -159,7 +157,7 @@ app.get('/api/summary', (req, res) => {
   const stateTax = netProfit * STATE_RATE;
   const totalTax = seTax + federalTax + stateTax;
 
-  res.json({
+  return {
     income: round2(income),
     expenses: round2(expenses),
     miles: round2(miles),
@@ -177,7 +175,151 @@ app.get('/api/summary', (req, res) => {
       stateRate: STATE_RATE,
       mileageRate: MILEAGE_RATE
     }
+  };
+}
+
+// ---- Tax summary route ----
+app.get('/api/summary', (req, res) => {
+  res.json(computeSummary(req.query.year));
+});
+
+// ---- Export: transactions + tax breakdown PDF ----
+app.get('/api/export/transactions', (req, res) => {
+  const { year } = req.query;
+  const entries = year
+    ? db.prepare('SELECT * FROM entries WHERE entry_date LIKE ? ORDER BY entry_date ASC').all(`${year}%`)
+    : db.prepare('SELECT * FROM entries ORDER BY entry_date ASC').all();
+  const summary = computeSummary(year);
+
+  const filename = `rover-tax-report${year ? '-' + year : ''}.pdf`;
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+
+  const doc = new PDFDocument({ margin: 50, size: 'LETTER' });
+  doc.pipe(res);
+
+  // Title
+  doc.fontSize(20).fillColor('#2a8a5f').text('Rover Income & Tax Report', { align: 'left' });
+  doc.fontSize(10).fillColor('#777').text(`${year ? 'Tax Year: ' + year : 'All Years'}  •  Generated ${new Date().toLocaleDateString()}`);
+  doc.moveDown(1.5);
+
+  // Tax summary box
+  doc.fontSize(14).fillColor('#2b2b2b').text('Tax Summary', { underline: true });
+  doc.moveDown(0.5);
+  doc.fontSize(11).fillColor('#2b2b2b');
+  const summaryLines = [
+    [`Total Income`, `$${summary.income.toFixed(2)}`],
+    [`Total Expenses`, `$${summary.expenses.toFixed(2)}`],
+    [`Total Miles`, `${summary.miles} mi`],
+    [`Mileage Deduction (@ $${summary.rates.mileageRate}/mi)`, `$${summary.mileageDeduction.toFixed(2)}`],
+    [`Net Profit`, `$${summary.netProfit.toFixed(2)}`],
+    [``, ``],
+    [`Self-Employment Tax (${(summary.rates.seTaxRate * 100).toFixed(1)}%)`, `$${summary.seTax.toFixed(2)}`],
+    [`Federal Income Tax (${(summary.rates.federalRate * 100).toFixed(1)}%)`, `$${summary.federalTax.toFixed(2)}`],
+    [`Michigan State Tax (${(summary.rates.stateRate * 100).toFixed(2)}%)`, `$${summary.stateTax.toFixed(2)}`],
+    [`Total Estimated Tax`, `$${summary.totalTax.toFixed(2)}`],
+    [`Estimated Quarterly Payment`, `$${summary.quarterlyPayment.toFixed(2)}`],
+  ];
+  summaryLines.forEach(([label, value]) => {
+    if (!label) { doc.moveDown(0.3); return; }
+    doc.text(label, { continued: true, width: 350 });
+    doc.text(value, { align: 'right' });
   });
+
+  doc.moveDown(0.5);
+  doc.fontSize(9).fillColor('#b8860b').text(
+    summary.quarterlyRequired
+      ? 'Quarterly estimated payments are likely required (total est. tax is $1,000 or more).'
+      : 'Below the $1,000 threshold — quarterly payments are likely not required at this income level.'
+  );
+  doc.fillColor('#2b2b2b');
+  doc.moveDown(1.5);
+
+  // Transactions table
+  doc.fontSize(14).text('All Transactions', { underline: true });
+  doc.moveDown(0.5);
+
+  const colX = { date: 50, type: 105, desc: 165, category: 340, amount: 440, miles: 500 };
+  doc.fontSize(9).fillColor('#777');
+  doc.text('Date', colX.date, doc.y, { continued: false });
+  doc.text('Type', colX.type, doc.y - 11);
+  doc.text('Description', colX.desc, doc.y - 11);
+  doc.text('Category', colX.category, doc.y - 11);
+  doc.text('Amount', colX.amount, doc.y - 11);
+  doc.text('Miles', colX.miles, doc.y - 11);
+  doc.moveDown(0.3);
+  doc.moveTo(50, doc.y).lineTo(560, doc.y).strokeColor('#e2ddd3').stroke();
+  doc.moveDown(0.3);
+
+  doc.fontSize(9).fillColor('#2b2b2b');
+  entries.forEach(e => {
+    if (doc.y > 700) {
+      doc.addPage();
+    }
+    const rowY = doc.y;
+    doc.text(e.entry_date, colX.date, rowY, { width: 50 });
+    doc.text(e.type, colX.type, rowY, { width: 55 });
+    doc.text((e.description || '').slice(0, 40), colX.desc, rowY, { width: 170 });
+    doc.text(e.category || '', colX.category, rowY, { width: 95 });
+    doc.text(e.type === 'mileage' ? '—' : `$${e.amount.toFixed(2)}`, colX.amount, rowY, { width: 55 });
+    doc.text(e.type === 'mileage' ? String(e.miles) : '—', colX.miles, rowY, { width: 40 });
+    doc.moveDown(0.6);
+  });
+
+  doc.end();
+});
+
+// ---- Export: all receipts bundled into one PDF ----
+app.get('/api/export/receipts', (req, res) => {
+  const { year } = req.query;
+  const entries = year
+    ? db.prepare(`SELECT * FROM entries WHERE receipt_path IS NOT NULL AND entry_date LIKE ? ORDER BY entry_date ASC`).all(`${year}%`)
+    : db.prepare(`SELECT * FROM entries WHERE receipt_path IS NOT NULL ORDER BY entry_date ASC`).all();
+
+  const filename = `rover-receipts${year ? '-' + year : ''}.pdf`;
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+
+  const doc = new PDFDocument({ margin: 40, size: 'LETTER' });
+  doc.pipe(res);
+
+  if (entries.length === 0) {
+    doc.fontSize(14).text('No receipts found for this selection.');
+    doc.end();
+    return;
+  }
+
+  const imageExt = /\.(jpe?g|png|webp)$/i;
+
+  entries.forEach((e, i) => {
+    if (i > 0) doc.addPage();
+
+    doc.fontSize(12).fillColor('#2b2b2b').text(
+      `${e.entry_date}  •  ${e.description || '(no description)'}  •  $${e.amount ? e.amount.toFixed(2) : '0.00'}`
+    );
+    doc.moveDown(0.5);
+
+    const filePath = path.join(__dirname, e.receipt_path);
+
+    if (imageExt.test(e.receipt_path) && fs.existsSync(filePath)) {
+      try {
+        doc.image(filePath, {
+          fit: [500, 600],
+          align: 'center'
+        });
+      } catch (err) {
+        doc.fontSize(10).fillColor('#c0392b').text(`(Could not embed image: ${err.message})`);
+      }
+    } else if (fs.existsSync(filePath)) {
+      doc.fontSize(10).fillColor('#777').text(
+        `Receipt is a non-image file (${path.basename(e.receipt_path)}) and could not be embedded directly. Find it in your uploads folder.`
+      );
+    } else {
+      doc.fontSize(10).fillColor('#c0392b').text('(Receipt file not found on server)');
+    }
+  });
+
+  doc.end();
 });
 
 function round2(n) {
