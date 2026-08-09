@@ -15,7 +15,7 @@ ROVER TRACKER — home screen icon setup
    <meta name="apple-mobile-web-app-capable" content="yes">
    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
    <meta name="apple-mobile-web-app-title" content="Rover">
-   <meta name="theme-color" content="#c9812f">
+   <meta name="theme-color" content="#6f4f9f">
 
 3. git pull on the server, rebuild/restart the rover-tracker container.
 
