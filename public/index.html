@@ -2,298 +2,105 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Rover Tracker</title>
+<title>Rover Tracker — Login</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <style>
-  :root {
-    --accent: #2a8a5f; --red: #c0392b; --amber: #b8860b;
-    --bg: #f7f5f1; --card: #ffffff; --text: #2b2b2b; --muted: #777;
-    --border: #e2ddd3;
+  :root { --accent: #2a8a5f; --bg: #f7f5f1; --card: #ffffff; --text: #2b2b2b; --border: #e2ddd3; }
+  [data-theme="dark"] {
+    --accent: #3fb37f; --bg: #1b1b1a; --card: #262524; --text: #ecebe8; --border: #3a3936;
   }
   * { box-sizing: border-box; }
   body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     background: var(--bg);
-    color: var(--text);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
     margin: 0;
-    padding: 24px 16px 60px;
-  }
-  .wrap { max-width: 900px; margin: 0 auto; }
-  header {
-    display: flex; justify-content: space-between; align-items: center;
-    margin-bottom: 24px;
-  }
-  h1 { font-size: 22px; margin: 0; }
-  #logoutBtn {
-    background: none; border: 1px solid var(--border); border-radius: 8px;
-    padding: 8px 14px; cursor: pointer; font-size: 13px; color: var(--muted);
+    color: var(--text);
+    transition: background 0.2s, color 0.2s;
   }
   .card {
-    background: var(--card); border: 1px solid var(--border);
-    border-radius: 14px; padding: 20px 22px; margin-bottom: 20px;
-    box-shadow: 0 2px 12px rgba(0,0,0,0.03);
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 36px 32px;
+    width: 320px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.06);
+    position: relative;
   }
-  .card h2 { font-size: 15px; margin: 0 0 16px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
-
-  .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px,1fr)); gap: 14px; }
-  .metric { text-align: left; }
-  .metric-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }
-  .metric-value { font-size: 22px; font-weight: 600; }
-  .v-green { color: var(--accent); }
-  .v-red { color: var(--red); }
-  .v-amber { color: var(--amber); }
-
-  .quarterly-banner {
-    margin-top: 16px; padding: 12px 16px; border-radius: 10px; font-size: 13px;
+  #themeToggle {
+    position: absolute; top: 14px; right: 14px;
+    background: none; border: 1px solid var(--border); border-radius: 8px;
+    padding: 5px 8px; font-size: 13px; cursor: pointer; color: var(--text);
   }
-  .banner-yes { background: #fdecea; color: var(--red); }
-  .banner-no { background: #e9f7ef; color: var(--accent); }
-
-  form.entry-form { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-  form.entry-form label { font-size: 12px; color: var(--muted); display: block; margin-bottom: 4px; }
-  form.entry-form input, form.entry-form select {
-    width: 100%; padding: 9px 10px; border: 1px solid var(--border);
-    border-radius: 8px; font-size: 14px;
+  h1 { font-size: 20px; margin: 0 0 6px; }
+  p.sub { color: #777; font-size: 13px; margin: 0 0 24px; }
+  input {
+    width: 100%;
+    padding: 11px 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 14px;
+    margin-bottom: 14px;
+    background: var(--card);
+    color: var(--text);
   }
-  .full { grid-column: 1 / -1; }
-  .form-actions { grid-column: 1 / -1; margin-top: 6px; }
-  button.primary {
-    background: var(--accent); color: white; border: none; border-radius: 8px;
-    padding: 10px 20px; font-size: 14px; font-weight: 600; cursor: pointer;
+  button[type="submit"] {
+    width: 100%;
+    padding: 11px;
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
   }
-  button.primary:hover { opacity: 0.9; }
-
-  table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  th, td { text-align: left; padding: 9px 8px; border-bottom: 1px solid var(--border); }
-  th { color: var(--muted); font-weight: 500; font-size: 11px; text-transform: uppercase; }
-  .tag { padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 600; }
-  .tag-income { background: #e9f7ef; color: var(--accent); }
-  .tag-expense { background: #fdecea; color: var(--red); }
-  .tag-mileage { background: #eaf1fb; color: #2a5fa8; }
-  a.receipt-link { color: var(--accent); text-decoration: none; font-size: 12px; }
-  .del-btn { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 13px; }
-  .del-btn:hover { color: var(--red); }
-  select#yearFilter { padding: 6px 10px; border-radius: 8px; border: 1px solid var(--border); font-size: 13px; }
-  .export-btn {
-    background: white; border: 1px solid var(--border); border-radius: 8px;
-    padding: 7px 12px; font-size: 13px; cursor: pointer; color: var(--text);
-  }
-  .export-btn:hover { background: #f2f0eb; }
+  button[type="submit"]:hover { opacity: 0.9; }
+  #error { color: #c0392b; font-size: 13px; margin-top: 10px; display: none; }
 </style>
 </head>
 <body>
-<div class="wrap">
-  <header>
+  <div class="card">
+    <button id="themeToggle" title="Toggle light/dark mode">🌙</button>
     <h1>🐾 Rover Tracker</h1>
-    <button id="logoutBtn">Log out</button>
-  </header>
-
-  <div class="card">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
-      <h2 style="margin:0;">Tax Estimate</h2>
-      <div style="display:flex;gap:8px;align-items:center;">
-        <select id="yearFilter"></select>
-        <button id="exportTransactionsBtn" class="export-btn">📄 Export Report</button>
-        <button id="exportReceiptsBtn" class="export-btn">🧾 Export Receipts</button>
-      </div>
-    </div>
-    <div class="summary-grid">
-      <div class="metric"><div class="metric-label">Income</div><div class="metric-value v-green" id="m-income">$0</div></div>
-      <div class="metric"><div class="metric-label">Expenses</div><div class="metric-value v-red" id="m-expenses">$0</div></div>
-      <div class="metric"><div class="metric-label">Mileage Deduction <span id="m-rate" style="text-transform:none;font-weight:400;">(@ $0.00/mi)</span></div><div class="metric-value v-green" id="m-mileage">$0</div></div>
-      <div class="metric"><div class="metric-label">Net Profit</div><div class="metric-value" id="m-profit">$0</div></div>
-    </div>
-    <hr style="border:none;border-top:1px solid var(--border);margin:18px 0;">
-    <div class="summary-grid">
-      <div class="metric"><div class="metric-label">SE Tax</div><div class="metric-value" id="m-se">$0</div></div>
-      <div class="metric"><div class="metric-label">Federal Tax</div><div class="metric-value" id="m-fed">$0</div></div>
-      <div class="metric"><div class="metric-label">State Tax</div><div class="metric-value" id="m-state">$0</div></div>
-      <div class="metric"><div class="metric-label">Total Estimated Tax</div><div class="metric-value v-amber" id="m-total">$0</div></div>
-    </div>
-    <div id="quarterlyBanner" class="quarterly-banner"></div>
-    <div id="ratesUsed" style="margin-top:10px;font-size:11px;color:var(--muted);"></div>
-  </div>
-
-  <div class="card">
-    <h2>Add Entry</h2>
-    <form class="entry-form" id="entryForm">
-      <div>
-        <label>Type</label>
-        <select id="type" required>
-          <option value="income">Income (Rover payout)</option>
-          <option value="expense">Expense</option>
-          <option value="mileage">Mileage (from Driversnote)</option>
-        </select>
-      </div>
-      <div>
-        <label>Date</label>
-        <input type="date" id="entry_date" required>
-      </div>
-      <div id="amountField">
-        <label>Amount ($)</label>
-        <input type="number" step="0.01" id="amount" placeholder="0.00">
-      </div>
-      <div id="milesField" style="display:none;">
-        <label>Miles</label>
-        <input type="number" step="0.1" id="miles" placeholder="0">
-      </div>
-      <div class="full">
-        <label>Description</label>
-        <input type="text" id="description" placeholder="e.g. Sarah's dog boarding - July">
-      </div>
-      <div>
-        <label>Category</label>
-        <select id="category">
-          <option value="Rover Payout">Rover Payout</option>
-          <option value="Rover Fee">Rover Fee</option>
-          <option value="Pet Supplies">Pet Supplies</option>
-          <option value="Insurance">Insurance</option>
-          <option value="Mileage">Mileage</option>
-          <option value="Other">Other</option>
-        </select>
-      </div>
-      <div>
-        <label>Receipt (optional)</label>
-        <input type="file" id="receipt" accept="image/*,.pdf">
-      </div>
-      <div class="form-actions">
-        <button type="submit" class="primary">Add Entry</button>
-      </div>
+    <p class="sub">Income, expenses, mileage & tax estimate</p>
+    <form id="loginForm">
+      <input type="password" id="password" placeholder="Password" autofocus required>
+      <button type="submit">Log In</button>
+      <div id="error">Incorrect password.</div>
     </form>
   </div>
 
-  <div class="card">
-    <h2>All Entries</h2>
-    <table>
-      <thead>
-        <tr><th>Date</th><th>Type</th><th>Description</th><th>Amount</th><th>Miles</th><th>Receipt</th><th></th></tr>
-      </thead>
-      <tbody id="entriesBody"></tbody>
-    </table>
-  </div>
-</div>
-
 <script>
-const typeSelect = document.getElementById('type');
-const amountField = document.getElementById('amountField');
-const milesField = document.getElementById('milesField');
-let currentMileageRate = 0;
-
-typeSelect.addEventListener('change', () => {
-  if (typeSelect.value === 'mileage') {
-    amountField.style.display = 'none';
-    milesField.style.display = 'block';
-  } else {
-    amountField.style.display = 'block';
-    milesField.style.display = 'none';
-  }
+function applyTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  document.getElementById('themeToggle').textContent = theme === 'dark' ? '☀️' : '🌙';
+}
+applyTheme(localStorage.getItem('rover-theme') || 'light');
+document.getElementById('themeToggle').addEventListener('click', () => {
+  const current = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+  const next = current === 'dark' ? 'light' : 'dark';
+  localStorage.setItem('rover-theme', next);
+  applyTheme(next);
 });
 
-document.getElementById('logoutBtn').addEventListener('click', async () => {
-  await fetch('/api/logout', { method: 'POST' });
-  window.location.href = '/login.html';
-});
-
-async function checkAuth() {
-  const res = await fetch('/api/session');
-  const data = await res.json();
-  if (!data.loggedIn) window.location.href = '/login.html';
-}
-
-function fmtMoney(n) {
-  return '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
-
-async function loadSummary() {
-  const year = document.getElementById('yearFilter').value;
-  const res = await fetch('/api/summary' + (year ? `?year=${year}` : ''));
-  const s = await res.json();
-  currentMileageRate = s.rates.mileageRate;
-  document.getElementById('m-income').textContent = fmtMoney(s.income);
-  document.getElementById('m-expenses').textContent = fmtMoney(s.expenses);
-  document.getElementById('m-mileage').textContent = fmtMoney(s.mileageDeduction);
-  document.getElementById('m-rate').textContent = `(@ $${s.rates.mileageRate.toFixed(2)}/mi)`;
-  document.getElementById('ratesUsed').textContent =
-    `Rates used: Mileage $${s.rates.mileageRate.toFixed(2)}/mi · SE tax ${(s.rates.seTaxRate*100).toFixed(1)}% · Federal ${(s.rates.federalRate*100).toFixed(1)}% · Michigan ${(s.rates.stateRate*100).toFixed(2)}%`;
-  document.getElementById('m-profit').textContent = fmtMoney(s.netProfit);
-  document.getElementById('m-se').textContent = fmtMoney(s.seTax);
-  document.getElementById('m-fed').textContent = fmtMoney(s.federalTax);
-  document.getElementById('m-state').textContent = fmtMoney(s.stateTax);
-  document.getElementById('m-total').textContent = fmtMoney(s.totalTax);
-
-  const banner = document.getElementById('quarterlyBanner');
-  if (s.quarterlyRequired) {
-    banner.className = 'quarterly-banner banner-yes';
-    banner.textContent = `Quarterly payments likely required — estimated ${fmtMoney(s.quarterlyPayment)} per quarter (total est. tax is $1,000+).`;
-  } else {
-    banner.className = 'quarterly-banner banner-no';
-    banner.textContent = `Below the $1,000 threshold — quarterly payments likely not required yet at this income level.`;
-  }
-}
-
-async function loadEntries() {
-  const res = await fetch('/api/entries');
-  const entries = await res.json();
-
-  const years = [...new Set(entries.map(e => e.entry_date.slice(0,4)))].sort().reverse();
-  const yearFilter = document.getElementById('yearFilter');
-  const currentVal = yearFilter.value;
-  yearFilter.innerHTML = '<option value="">All years</option>' + years.map(y => `<option value="${y}">${y}</option>`).join('');
-  if (currentVal) yearFilter.value = currentVal;
-
-  const tbody = document.getElementById('entriesBody');
-  tbody.innerHTML = entries.map(e => `
-    <tr>
-      <td>${e.entry_date}</td>
-      <td><span class="tag tag-${e.type}">${e.type}</span></td>
-      <td>${e.description || ''}${e.category ? ' <span style="color:#999;">· ' + e.category + '</span>' : ''}</td>
-      <td>${e.type === 'mileage' ? fmtMoney(e.miles * currentMileageRate) : fmtMoney(e.amount)}</td>
-      <td>${e.type === 'mileage' ? e.miles : '—'}</td>
-      <td>${e.receipt_path ? `<a class="receipt-link" href="${e.receipt_path}" target="_blank">View</a>` : ''}</td>
-      <td><button class="del-btn" onclick="deleteEntry(${e.id})">✕</button></td>
-    </tr>
-  `).join('');
-}
-
-async function deleteEntry(id) {
-  if (!confirm('Delete this entry?')) return;
-  await fetch('/api/entries/' + id, { method: 'DELETE' });
-  loadSummary().then(loadEntries);
-}
-
-document.getElementById('yearFilter').addEventListener('change', loadSummary);
-
-document.getElementById('exportTransactionsBtn').addEventListener('click', () => {
-  const year = document.getElementById('yearFilter').value;
-  window.location.href = '/api/export/transactions' + (year ? `?year=${year}` : '');
-});
-
-document.getElementById('exportReceiptsBtn').addEventListener('click', () => {
-  const year = document.getElementById('yearFilter').value;
-  window.location.href = '/api/export/receipts' + (year ? `?year=${year}` : '');
-});
-
-document.getElementById('entryForm').addEventListener('submit', async (e) => {
+document.getElementById('loginForm').addEventListener('submit', async (e) => {
   e.preventDefault();
-  const formData = new FormData();
-  formData.append('type', document.getElementById('type').value);
-  formData.append('entry_date', document.getElementById('entry_date').value);
-  formData.append('description', document.getElementById('description').value);
-  formData.append('amount', document.getElementById('amount').value || 0);
-  formData.append('miles', document.getElementById('miles').value || 0);
-  formData.append('category', document.getElementById('category').value);
-  const receiptFile = document.getElementById('receipt').files[0];
-  if (receiptFile) formData.append('receipt', receiptFile);
-
-  await fetch('/api/entries', { method: 'POST', body: formData });
-  document.getElementById('entryForm').reset();
-  amountField.style.display = 'block';
-  milesField.style.display = 'none';
-  loadSummary().then(loadEntries);
+  const password = document.getElementById('password').value;
+  const res = await fetch('/api/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ password })
+  });
+  if (res.ok) {
+    window.location.href = '/';
+  } else {
+    document.getElementById('error').style.display = 'block';
+  }
 });
-
-checkAuth();
-loadSummary().then(loadEntries);
 </script>
 </body>
 </html>
