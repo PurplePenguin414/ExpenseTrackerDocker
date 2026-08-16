@@ -16,7 +16,7 @@ const SE_TAX_RATE = parseFloat(process.env.SE_TAX_RATE || '0.153');
 const SE_TAXABLE_FRACTION = parseFloat(process.env.SE_TAXABLE_FRACTION || '0.9235');
 const FEDERAL_RATE = parseFloat(process.env.FEDERAL_RATE || '0.12');
 const STATE_RATE = parseFloat(process.env.STATE_RATE || '0.0425');
-const MILEAGE_RATE = parseFloat(process.env.MILEAGE_RATE || '0.67');
+const MILEAGE_RATE = parseFloat(process.env.MILEAGE_RATE || '0.76');
 
 // ---- Ensure data/uploads dirs exist ----
 const dataDir = path.join(__dirname, 'data');
@@ -26,9 +26,19 @@ if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
 
 // ---- Database setup ----
 const db = new Database(path.join(dataDir, 'rover.db'));
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS jobs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+  )
+`);
+
 db.exec(`
   CREATE TABLE IF NOT EXISTS entries (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    job_id INTEGER,
     type TEXT NOT NULL,          -- 'income' | 'expense' | 'mileage'
     entry_date TEXT NOT NULL,
     description TEXT,
@@ -40,6 +50,20 @@ db.exec(`
   )
 `);
 
+// ---- Migration: ensure job_id column exists on older databases ----
+const entryCols = db.prepare("PRAGMA table_info(entries)").all().map(c => c.name);
+if (!entryCols.includes('job_id')) {
+  db.exec(`ALTER TABLE entries ADD COLUMN job_id INTEGER`);
+}
+
+// ---- Seed: ensure a "Rover" job exists, and backfill any orphaned entries to it ----
+let roverJob = db.prepare(`SELECT * FROM jobs WHERE name = 'Rover'`).get();
+if (!roverJob) {
+  const result = db.prepare(`INSERT INTO jobs (name) VALUES ('Rover')`).run();
+  roverJob = { id: result.lastInsertRowid, name: 'Rover' };
+}
+db.prepare(`UPDATE entries SET job_id = ? WHERE job_id IS NULL`).run(roverJob.id);
+
 // ---- Middleware ----
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -50,7 +74,6 @@ app.use(session({
   cookie: { maxAge: 1000 * 60 * 60 * 24 * 30 } // 30 days
 }));
 
-// Serve uploaded receipts only to authenticated users (mounted after auth check below)
 function requireAuth(req, res, next) {
   if (req.session && req.session.loggedIn) return next();
   if (req.path.startsWith('/api/')) return res.status(401).json({ error: 'Not authenticated' });
@@ -99,23 +122,65 @@ app.get('/api/session', (req, res) => {
 app.use('/uploads', requireAuth, express.static(uploadsDir));
 app.use('/api', requireAuth);
 
+// ---- Job routes ----
+app.get('/api/jobs', (req, res) => {
+  const jobs = db.prepare('SELECT * FROM jobs ORDER BY created_at ASC').all();
+  res.json(jobs);
+});
+
+app.post('/api/jobs', (req, res) => {
+  const name = (req.body.name || '').trim();
+  if (!name) return res.status(400).json({ error: 'Job name is required' });
+  const existing = db.prepare('SELECT * FROM jobs WHERE name = ?').get(name);
+  if (existing) return res.status(409).json({ error: 'A job with that name already exists' });
+  const result = db.prepare('INSERT INTO jobs (name) VALUES (?)').run(name);
+  res.json({ id: result.lastInsertRowid, name });
+});
+
+app.delete('/api/jobs/:id', (req, res) => {
+  const jobId = req.params.id;
+  const job = db.prepare('SELECT * FROM jobs WHERE id = ?').get(jobId);
+  if (!job) return res.status(404).json({ error: 'Job not found' });
+  if (job.name === 'Rover') return res.status(400).json({ error: 'The Rover tab cannot be deleted' });
+
+  // Delete receipt files tied to this job's entries first
+  const entries = db.prepare('SELECT * FROM entries WHERE job_id = ?').all(jobId);
+  entries.forEach(e => {
+    if (e.receipt_path) {
+      const filePath = path.join(__dirname, e.receipt_path);
+      if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+    }
+  });
+  db.prepare('DELETE FROM entries WHERE job_id = ?').run(jobId);
+  db.prepare('DELETE FROM jobs WHERE id = ?').run(jobId);
+  res.json({ ok: true });
+});
+
 // ---- Entry routes ----
+// job_id query param: a specific job's id, or 'all' / omitted for every job combined
 app.get('/api/entries', (req, res) => {
-  const rows = db.prepare('SELECT * FROM entries ORDER BY entry_date DESC, id DESC').all();
+  const { job_id } = req.query;
+  let rows;
+  if (job_id && job_id !== 'all') {
+    rows = db.prepare('SELECT * FROM entries WHERE job_id = ? ORDER BY entry_date DESC, id DESC').all(job_id);
+  } else {
+    rows = db.prepare('SELECT * FROM entries ORDER BY entry_date DESC, id DESC').all();
+  }
   res.json(rows);
 });
 
 app.post('/api/entries', upload.single('receipt'), (req, res) => {
-  const { type, entry_date, description, amount, miles, category } = req.body;
-  if (!type || !entry_date) return res.status(400).json({ error: 'type and entry_date are required' });
+  const { job_id, type, entry_date, description, amount, miles, category } = req.body;
+  if (!job_id || !type || !entry_date) return res.status(400).json({ error: 'job_id, type and entry_date are required' });
 
   const receiptPath = req.file ? '/uploads/' + req.file.filename : null;
 
   const stmt = db.prepare(`
-    INSERT INTO entries (type, entry_date, description, amount, miles, category, receipt_path)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO entries (job_id, type, entry_date, description, amount, miles, category, receipt_path)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
   `);
   const result = stmt.run(
+    job_id,
     type,
     entry_date,
     description || '',
@@ -138,14 +203,18 @@ app.delete('/api/entries/:id', (req, res) => {
 });
 
 // ---- Summary calculation helper (shared by /api/summary and PDF export) ----
-function computeSummary(year) {
-  const income = db.prepare(`SELECT COALESCE(SUM(amount),0) as total FROM entries WHERE type = 'income' ${year ? `AND entry_date LIKE ?` : ''}`)
+// job_id: specific job id, or null/undefined/'all' for every job combined
+function computeSummary(job_id, year) {
+  const jobFilter = (job_id && job_id !== 'all') ? `AND job_id = ${parseInt(job_id, 10)}` : '';
+  // parseInt above is safe: job_id always comes from our own job IDs (integers), never used in raw string concatenation with user text
+
+  const income = db.prepare(`SELECT COALESCE(SUM(amount),0) as total FROM entries WHERE type = 'income' ${jobFilter} ${year ? `AND entry_date LIKE ?` : ''}`)
     .get(...(year ? [`${year}%`] : [])).total;
 
-  const expenses = db.prepare(`SELECT COALESCE(SUM(amount),0) as total FROM entries WHERE type = 'expense' ${year ? `AND entry_date LIKE ?` : ''}`)
+  const expenses = db.prepare(`SELECT COALESCE(SUM(amount),0) as total FROM entries WHERE type = 'expense' ${jobFilter} ${year ? `AND entry_date LIKE ?` : ''}`)
     .get(...(year ? [`${year}%`] : [])).total;
 
-  const miles = db.prepare(`SELECT COALESCE(SUM(miles),0) as total FROM entries WHERE type = 'mileage' ${year ? `AND entry_date LIKE ?` : ''}`)
+  const miles = db.prepare(`SELECT COALESCE(SUM(miles),0) as total FROM entries WHERE type = 'mileage' ${jobFilter} ${year ? `AND entry_date LIKE ?` : ''}`)
     .get(...(year ? [`${year}%`] : [])).total;
 
   const mileageDeduction = miles * MILEAGE_RATE;
@@ -180,18 +249,25 @@ function computeSummary(year) {
 
 // ---- Tax summary route ----
 app.get('/api/summary', (req, res) => {
-  res.json(computeSummary(req.query.year));
+  res.json(computeSummary(req.query.job_id, req.query.year));
 });
 
 // ---- Export: transactions + tax breakdown PDF ----
 app.get('/api/export/transactions', (req, res) => {
-  const { year } = req.query;
+  const { year, job_id } = req.query;
+  const jobFilter = (job_id && job_id !== 'all') ? `AND job_id = ${parseInt(job_id, 10)}` : '';
   const entries = year
-    ? db.prepare('SELECT * FROM entries WHERE entry_date LIKE ? ORDER BY entry_date ASC').all(`${year}%`)
-    : db.prepare('SELECT * FROM entries ORDER BY entry_date ASC').all();
-  const summary = computeSummary(year);
+    ? db.prepare(`SELECT * FROM entries WHERE 1=1 ${jobFilter} AND entry_date LIKE ? ORDER BY entry_date ASC`).all(`${year}%`)
+    : db.prepare(`SELECT * FROM entries WHERE 1=1 ${jobFilter} ORDER BY entry_date ASC`).all();
+  const summary = computeSummary(job_id, year);
 
-  const filename = `rover-tax-report${year ? '-' + year : ''}.pdf`;
+  let jobLabel = 'All Jobs';
+  if (job_id && job_id !== 'all') {
+    const job = db.prepare('SELECT * FROM jobs WHERE id = ?').get(job_id);
+    if (job) jobLabel = job.name;
+  }
+
+  const filename = `${jobLabel.replace(/\s+/g, '-').toLowerCase()}-tax-report${year ? '-' + year : ''}.pdf`;
   res.setHeader('Content-Type', 'application/pdf');
   res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
 
@@ -199,7 +275,7 @@ app.get('/api/export/transactions', (req, res) => {
   doc.pipe(res);
 
   // Title
-  doc.fontSize(20).fillColor('#2a8a5f').text('Rover Income & Tax Report', { align: 'left' });
+  doc.fontSize(20).fillColor('#2a8a5f').text(`${jobLabel} Income & Tax Report`, { align: 'left' });
   doc.fontSize(10).fillColor('#777').text(`${year ? 'Tax Year: ' + year : 'All Years'}  •  Generated ${new Date().toLocaleDateString()}`);
   doc.moveDown(1.5);
 
@@ -232,6 +308,9 @@ app.get('/api/export/transactions', (req, res) => {
       ? 'Quarterly estimated payments are likely required (total est. tax is $1,000 or more).'
       : 'Below the $1,000 threshold — quarterly payments are likely not required at this income level.'
   );
+  if (jobLabel !== 'All Jobs') {
+    doc.fontSize(8).fillColor('#777').text('Note: IRS self-employment tax thresholds apply to your combined income across all side jobs, not each one individually. Check the "All Jobs" report for your true overall obligation.');
+  }
   doc.fillColor('#2b2b2b');
   doc.moveDown(1.5);
 
@@ -271,12 +350,19 @@ app.get('/api/export/transactions', (req, res) => {
 
 // ---- Export: all receipts bundled into one PDF ----
 app.get('/api/export/receipts', (req, res) => {
-  const { year } = req.query;
+  const { year, job_id } = req.query;
+  const jobFilter = (job_id && job_id !== 'all') ? `AND job_id = ${parseInt(job_id, 10)}` : '';
   const entries = year
-    ? db.prepare(`SELECT * FROM entries WHERE receipt_path IS NOT NULL AND entry_date LIKE ? ORDER BY entry_date ASC`).all(`${year}%`)
-    : db.prepare(`SELECT * FROM entries WHERE receipt_path IS NOT NULL ORDER BY entry_date ASC`).all();
+    ? db.prepare(`SELECT * FROM entries WHERE receipt_path IS NOT NULL ${jobFilter} AND entry_date LIKE ? ORDER BY entry_date ASC`).all(`${year}%`)
+    : db.prepare(`SELECT * FROM entries WHERE receipt_path IS NOT NULL ${jobFilter} ORDER BY entry_date ASC`).all();
 
-  const filename = `rover-receipts${year ? '-' + year : ''}.pdf`;
+  let jobLabel = 'all-jobs';
+  if (job_id && job_id !== 'all') {
+    const job = db.prepare('SELECT * FROM jobs WHERE id = ?').get(job_id);
+    if (job) jobLabel = job.name.replace(/\s+/g, '-').toLowerCase();
+  }
+
+  const filename = `${jobLabel}-receipts${year ? '-' + year : ''}.pdf`;
   res.setHeader('Content-Type', 'application/pdf');
   res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
 

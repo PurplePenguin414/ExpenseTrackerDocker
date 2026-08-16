@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Rover Tracker</title>
+<title>Side Job Tracker</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <style>
   :root {
@@ -27,7 +27,7 @@
   .wrap { max-width: 900px; margin: 0 auto; }
   header {
     display: flex; justify-content: space-between; align-items: center;
-    margin-bottom: 24px;
+    margin-bottom: 18px;
   }
   .header-actions { display: flex; gap: 8px; align-items: center; }
   h1 { font-size: 22px; margin: 0; }
@@ -37,6 +37,29 @@
   }
   #themeToggle { padding: 8px 12px; font-size: 15px; }
   #logoutBtn:hover, #themeToggle:hover { background: var(--card); }
+
+  /* Job tabs */
+  .tab-bar {
+    display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 20px;
+    border-bottom: 1px solid var(--border); padding-bottom: 0;
+  }
+  .tab-btn {
+    background: none; border: none; border-bottom: 2px solid transparent;
+    padding: 10px 14px; font-size: 14px; cursor: pointer; color: var(--muted);
+    font-weight: 500;
+  }
+  .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+  .tab-btn:hover:not(.active) { color: var(--text); }
+  .tab-add {
+    background: none; border: none; padding: 10px 12px; font-size: 16px;
+    cursor: pointer; color: var(--muted);
+  }
+  .tab-add:hover { color: var(--accent); }
+  .tab-del {
+    margin-left: 5px; font-size: 11px; color: var(--muted); cursor: pointer;
+  }
+  .tab-del:hover { color: var(--red); }
+
   .card {
     background: var(--card); border: 1px solid var(--border);
     border-radius: 14px; padding: 20px 22px; margin-bottom: 20px;
@@ -57,6 +80,10 @@
   }
   .banner-yes { background: #fdecea; color: var(--red); }
   .banner-no { background: #e9f7ef; color: var(--accent); }
+
+  .info-note {
+    margin-top: 10px; font-size: 12px; color: var(--muted); font-style: italic;
+  }
 
   form.entry-form { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
   form.entry-form label { font-size: 12px; color: var(--muted); display: block; margin-bottom: 4px; }
@@ -83,6 +110,10 @@
   .tag-income { background: #e9f7ef; color: var(--accent); }
   .tag-expense { background: #fdecea; color: var(--red); }
   .tag-mileage { background: #eaf1fb; color: #2a5fa8; }
+  .job-pill {
+    display: inline-block; padding: 1px 7px; border-radius: 20px; font-size: 10px;
+    background: var(--bg); color: var(--muted); margin-left: 6px;
+  }
   a.receipt-link { color: var(--accent); text-decoration: none; font-size: 12px; }
   .del-btn { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 13px; }
   .del-btn:hover { color: var(--red); }
@@ -96,12 +127,14 @@
 <body>
 <div class="wrap">
   <header>
-    <h1>🐾 Rover Tracker</h1>
+    <h1 id="pageTitle">🐾 Side Job Tracker</h1>
     <div class="header-actions">
       <button id="themeToggle" title="Toggle light/dark mode">🌙</button>
       <button id="logoutBtn">Log out</button>
     </div>
   </header>
+
+  <div class="tab-bar" id="tabBar"></div>
 
   <div class="card">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
@@ -127,17 +160,18 @@
     </div>
     <div id="quarterlyBanner" class="quarterly-banner"></div>
     <div id="ratesUsed" style="margin-top:10px;font-size:11px;color:var(--muted);"></div>
+    <div id="allJobsNote" class="info-note" style="display:none;">This is your combined total across every job — the number that actually determines your quarterly tax obligation.</div>
   </div>
 
-  <div class="card">
+  <div class="card" id="addEntryCard">
     <h2>Add Entry</h2>
     <form class="entry-form" id="entryForm">
       <div>
         <label>Type</label>
         <select id="type" required>
-          <option value="income">Income (Rover payout)</option>
+          <option value="income">Income</option>
           <option value="expense">Expense</option>
-          <option value="mileage">Mileage (from Driversnote)</option>
+          <option value="mileage">Mileage</option>
         </select>
       </div>
       <div>
@@ -154,14 +188,14 @@
       </div>
       <div class="full">
         <label>Description</label>
-        <input type="text" id="description" placeholder="e.g. Sarah's dog boarding - July">
+        <input type="text" id="description" placeholder="e.g. Delivery batch - July 12">
       </div>
       <div>
         <label>Category</label>
         <select id="category">
-          <option value="Rover Payout">Rover Payout</option>
-          <option value="Rover Fee">Rover Fee</option>
-          <option value="Pet Supplies">Pet Supplies</option>
+          <option value="Payout">Payout</option>
+          <option value="Platform Fee">Platform Fee</option>
+          <option value="Supplies">Supplies</option>
           <option value="Insurance">Insurance</option>
           <option value="Mileage">Mileage</option>
           <option value="Other">Other</option>
@@ -175,6 +209,10 @@
         <button type="submit" class="primary">Add Entry</button>
       </div>
     </form>
+  </div>
+
+  <div class="card" id="allJobsAddNotice" style="display:none;">
+    <p style="margin:0;color:var(--muted);font-size:13px;">Select a specific job tab above to add an entry — "All Jobs" is a combined view only.</p>
   </div>
 
   <div class="card">
@@ -193,14 +231,15 @@ const typeSelect = document.getElementById('type');
 const amountField = document.getElementById('amountField');
 const milesField = document.getElementById('milesField');
 let currentMileageRate = 0;
+let jobs = [];
+let currentJobId = null; // null/'all' means combined view
 
 // ---- Theme toggle ----
 function applyTheme(theme) {
   document.documentElement.setAttribute('data-theme', theme);
   document.getElementById('themeToggle').textContent = theme === 'dark' ? '☀️' : '🌙';
 }
-const savedTheme = localStorage.getItem('rover-theme') || 'light';
-applyTheme(savedTheme);
+applyTheme(localStorage.getItem('rover-theme') || 'light');
 document.getElementById('themeToggle').addEventListener('click', () => {
   const current = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
   const next = current === 'dark' ? 'light' : 'dark';
@@ -233,9 +272,70 @@ function fmtMoney(n) {
   return '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+// ---- Job tabs ----
+async function loadJobs() {
+  const res = await fetch('/api/jobs');
+  jobs = await res.json();
+  if (currentJobId === null && jobs.length > 0) {
+    currentJobId = jobs[0].id; // default to first job (Rover) on first load
+  }
+  renderTabs();
+}
+
+function renderTabs() {
+  const tabBar = document.getElementById('tabBar');
+  let html = '';
+  jobs.forEach(j => {
+    const active = String(currentJobId) === String(j.id) ? 'active' : '';
+    const delBtn = j.name === 'Rover' ? '' : `<span class="tab-del" onclick="event.stopPropagation(); deleteJob(${j.id}, '${j.name.replace(/'/g, "\\'")}')">✕</span>`;
+    html += `<button class="tab-btn ${active}" onclick="selectJob(${j.id})">${j.name}${delBtn}</button>`;
+  });
+  const allActive = currentJobId === 'all' ? 'active' : '';
+  html += `<button class="tab-btn ${allActive}" onclick="selectJob('all')">All Jobs</button>`;
+  html += `<button class="tab-add" title="Add a new job" onclick="addJob()">+</button>`;
+  tabBar.innerHTML = html;
+}
+
+function selectJob(jobId) {
+  currentJobId = jobId;
+  renderTabs();
+  const isAll = currentJobId === 'all';
+  document.getElementById('addEntryCard').style.display = isAll ? 'none' : 'block';
+  document.getElementById('allJobsAddNotice').style.display = isAll ? 'block' : 'none';
+  document.getElementById('allJobsNote').style.display = isAll ? 'block' : 'none';
+  loadSummary().then(loadEntries);
+}
+
+async function addJob() {
+  const name = prompt('Name of the new job (e.g. DoorDash, Uber Eats, Instacart):');
+  if (!name || !name.trim()) return;
+  const res = await fetch('/api/jobs', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: name.trim() })
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    alert(err.error || 'Could not add job');
+    return;
+  }
+  const newJob = await res.json();
+  await loadJobs();
+  selectJob(newJob.id);
+}
+
+async function deleteJob(jobId, name) {
+  if (!confirm(`Delete "${name}" and all its entries and receipts? This can't be undone.`)) return;
+  await fetch('/api/jobs/' + jobId, { method: 'DELETE' });
+  if (String(currentJobId) === String(jobId)) currentJobId = null;
+  await loadJobs();
+  selectJob(currentJobId || (jobs[0] ? jobs[0].id : 'all'));
+}
+
 async function loadSummary() {
   const year = document.getElementById('yearFilter').value;
-  const res = await fetch('/api/summary' + (year ? `?year=${year}` : ''));
+  const jobParam = currentJobId === 'all' ? 'all' : currentJobId;
+  const res = await fetch(`/api/summary?job_id=${jobParam}` + (year ? `&year=${year}` : ''));
   const s = await res.json();
   currentMileageRate = s.rates.mileageRate;
   document.getElementById('m-income').textContent = fmtMoney(s.income);
@@ -261,21 +361,24 @@ async function loadSummary() {
 }
 
 async function loadEntries() {
-  const res = await fetch('/api/entries');
+  const jobParam = currentJobId === 'all' ? 'all' : currentJobId;
+  const res = await fetch(`/api/entries?job_id=${jobParam}`);
   const entries = await res.json();
 
-  // Populate year filter
   const years = [...new Set(entries.map(e => e.entry_date.slice(0,4)))].sort().reverse();
   const yearFilter = document.getElementById('yearFilter');
   const currentVal = yearFilter.value;
   yearFilter.innerHTML = '<option value="">All years</option>' + years.map(y => `<option value="${y}">${y}</option>`).join('');
   if (currentVal) yearFilter.value = currentVal;
 
+  const jobMap = {};
+  jobs.forEach(j => jobMap[j.id] = j.name);
+
   const tbody = document.getElementById('entriesBody');
   tbody.innerHTML = entries.map(e => `
     <tr>
       <td>${e.entry_date}</td>
-      <td><span class="tag tag-${e.type}">${e.type}</span></td>
+      <td><span class="tag tag-${e.type}">${e.type}</span>${currentJobId === 'all' ? `<span class="job-pill">${jobMap[e.job_id] || ''}</span>` : ''}</td>
       <td>${e.description || ''}${e.category ? ' <span style="color:#999;">· ' + e.category + '</span>' : ''}</td>
       <td>${e.type === 'mileage' ? fmtMoney(e.miles * currentMileageRate) : fmtMoney(e.amount)}</td>
       <td>${e.type === 'mileage' ? e.miles : '—'}</td>
@@ -295,17 +398,21 @@ document.getElementById('yearFilter').addEventListener('change', loadSummary);
 
 document.getElementById('exportTransactionsBtn').addEventListener('click', () => {
   const year = document.getElementById('yearFilter').value;
-  window.location.href = '/api/export/transactions' + (year ? `?year=${year}` : '');
+  const jobParam = currentJobId === 'all' ? 'all' : currentJobId;
+  window.location.href = `/api/export/transactions?job_id=${jobParam}` + (year ? `&year=${year}` : '');
 });
 
 document.getElementById('exportReceiptsBtn').addEventListener('click', () => {
   const year = document.getElementById('yearFilter').value;
-  window.location.href = '/api/export/receipts' + (year ? `?year=${year}` : '');
+  const jobParam = currentJobId === 'all' ? 'all' : currentJobId;
+  window.location.href = `/api/export/receipts?job_id=${jobParam}` + (year ? `&year=${year}` : '');
 });
 
 document.getElementById('entryForm').addEventListener('submit', async (e) => {
   e.preventDefault();
+  if (currentJobId === 'all') return;
   const formData = new FormData();
+  formData.append('job_id', currentJobId);
   formData.append('type', document.getElementById('type').value);
   formData.append('entry_date', document.getElementById('entry_date').value);
   formData.append('description', document.getElementById('description').value);
@@ -322,8 +429,13 @@ document.getElementById('entryForm').addEventListener('submit', async (e) => {
   loadSummary().then(loadEntries);
 });
 
-checkAuth();
-loadSummary().then(loadEntries);
+async function init() {
+  await checkAuth();
+  await loadJobs();
+  await loadSummary();
+  await loadEntries();
+}
+init();
 </script>
 </body>
 </html>
