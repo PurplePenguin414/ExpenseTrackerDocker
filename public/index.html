@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <title>Side Job Tracker</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <style>
   :root {
     --accent: #2a8a5f; --red: #c0392b; --amber: #b8860b;
@@ -276,8 +277,8 @@ function fmtMoney(n) {
 async function loadJobs() {
   const res = await fetch('/api/jobs');
   jobs = await res.json();
-  if (currentJobId === null && jobs.length > 0) {
-    currentJobId = jobs[0].id; // default to first job (Rover) on first load
+  if (currentJobId === null) {
+    currentJobId = 'all'; // default to combined view on first load
   }
   renderTabs();
 }
@@ -285,13 +286,13 @@ async function loadJobs() {
 function renderTabs() {
   const tabBar = document.getElementById('tabBar');
   let html = '';
+  const allActive = currentJobId === 'all' ? 'active' : '';
+  html += `<button class="tab-btn ${allActive}" onclick="selectJob('all')">All Jobs</button>`;
   jobs.forEach(j => {
     const active = String(currentJobId) === String(j.id) ? 'active' : '';
     const delBtn = j.name === 'Rover' ? '' : `<span class="tab-del" onclick="event.stopPropagation(); deleteJob(${j.id}, '${j.name.replace(/'/g, "\\'")}')">✕</span>`;
     html += `<button class="tab-btn ${active}" onclick="selectJob(${j.id})">${j.name}${delBtn}</button>`;
   });
-  const allActive = currentJobId === 'all' ? 'active' : '';
-  html += `<button class="tab-btn ${allActive}" onclick="selectJob('all')">All Jobs</button>`;
   html += `<button class="tab-add" title="Add a new job" onclick="addJob()">+</button>`;
   tabBar.innerHTML = html;
 }
@@ -432,6 +433,9 @@ document.getElementById('entryForm').addEventListener('submit', async (e) => {
 async function init() {
   await checkAuth();
   await loadJobs();
+  document.getElementById('addEntryCard').style.display = currentJobId === 'all' ? 'none' : 'block';
+  document.getElementById('allJobsAddNotice').style.display = currentJobId === 'all' ? 'block' : 'none';
+  document.getElementById('allJobsNote').style.display = currentJobId === 'all' ? 'block' : 'none';
   await loadSummary();
   await loadEntries();
 }
