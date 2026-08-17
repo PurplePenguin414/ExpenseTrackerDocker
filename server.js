@@ -118,6 +118,22 @@ app.get('/api/session', (req, res) => {
   res.json({ loggedIn: !!(req.session && req.session.loggedIn) });
 });
 
+// ---- Widget endpoint (API key auth, not session — for iOS Scriptable widget) ----
+app.get('/api/widget/summary', (req, res) => {
+  const key = req.query.key || req.headers['x-widget-key'];
+  if (!process.env.WIDGET_API_KEY || key !== process.env.WIDGET_API_KEY) {
+    return res.status(401).json({ error: 'Invalid or missing widget API key' });
+  }
+  const jobId = req.query.job_id || 'all';
+  const summary = computeSummary(jobId, req.query.year);
+  let jobLabel = 'All Jobs';
+  if (jobId !== 'all') {
+    const job = db.prepare('SELECT * FROM jobs WHERE id = ?').get(jobId);
+    if (job) jobLabel = job.name;
+  }
+  res.json({ jobLabel, ...summary });
+});
+
 // ---- Protect everything below this point ----
 app.use('/uploads', requireAuth, express.static(uploadsDir));
 app.use('/api', requireAuth);
