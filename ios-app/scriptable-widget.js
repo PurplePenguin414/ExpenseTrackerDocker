@@ -1,25 +1,17 @@
 // Side Job Tracker — Tax Summary Widget
 // Scriptable widget, adapts automatically to small / medium / large sizes.
-//
-// SETUP:
-// 1. In the Rover Tracker .env file on your server, set WIDGET_API_KEY to a
-//    random string (already added if you pulled the latest update).
-// 2. Fill in API_URL and WIDGET_KEY below.
-// 3. Save this script in Scriptable (e.g. named "Side Job Tax Widget").
-// 4. Long-press your home screen → add a Scriptable widget → choose this
-//    script → pick any size (small, medium, or large all work).
 
 const API_URL = "https://rover.megangibbs.net"; // no trailing slash
-const WIDGET_KEY = "PASTE_YOUR_WIDGET_API_KEY_HERE";
+const WIDGET_KEY = "96820c6fc410e2e13a809d8137bf721550d8c3036128cca7";
 const JOB_ID = "all"; // 'all' = combined tax picture across every job
 
 // ---- Colors (adapt to iOS light/dark automatically) ----
-const bgColor = Color.dynamic(new Color("#ffffff"), new Color("#1b1b1a"));
-const cardColor = Color.dynamic(new Color("#f7f5f1"), new Color("#262524"));
-const textColor = Color.dynamic(new Color("#2b2b2b"), new Color("#ecebe8"));
-const mutedColor = Color.dynamic(new Color("#777777"), new Color("#9a9892"));
-const accentColor = new Color("#2a8a5f");
-const redColor = new Color("#c0392b");
+const bgColor = Color.dynamic(new Color("#ffffff"), new Color("#121212"));
+const cardColor = Color.dynamic(new Color("#f7f5f1"), new Color("#1c1c1c"));
+const textColor = Color.dynamic(new Color("#2b2b2b"), new Color("#f0f0f0"));
+const mutedColor = Color.dynamic(new Color("#777777"), new Color("#9a9a9a"));
+const accentColor = Color.dynamic(new Color("#2a8a5f"), new Color("#4a90e2"));
+const redColor = Color.dynamic(new Color("#c0392b"), new Color("#d16b5c"));
 const amberColor = new Color("#b8860b");
 
 async function fetchSummary() {
@@ -50,19 +42,20 @@ function buildWidget(data, family) {
   w.backgroundColor = bgColor;
   w.setPadding(14, 14, 14, 14);
 
-  const title = w.addText("🐾 " + data.jobLabel);
+  const title = w.addText("🧾 " + data.jobLabel);
   title.font = Font.boldSystemFont(family === "small" ? 13 : 15);
   title.textColor = textColor;
   w.addSpacer(family === "small" ? 6 : 10);
 
   if (family === "small") {
-    // Small: just the two numbers that matter most
     addLabelValue(w, "Net Profit", fmtMoney(data.netProfit), textColor, family);
-    w.addSpacer(6);
+    w.addSpacer(5);
+    addLabelValue(w, "Mileage Ded.", fmtMoney(data.mileageDeduction), accentColor, family);
+    w.addSpacer(5);
     addLabelValue(w, "Est. Tax Owed", fmtMoney(data.totalTax), amberColor, family);
-    w.addSpacer(8);
+    w.addSpacer(6);
     const banner = w.addText(data.quarterlyRequired ? "Quarterly due" : "Under $1,000");
-    banner.font = Font.systemFont(10);
+    banner.font = Font.systemFont(9);
     banner.textColor = data.quarterlyRequired ? redColor : accentColor;
     return w;
   }
@@ -80,8 +73,14 @@ function buildWidget(data, family) {
 
     const col2 = row.addStack();
     col2.layoutVertically();
+    addLabelValue(col2, "Mileage Ded.", fmtMoney(data.mileageDeduction), accentColor, family);
     addLabelValue(col2, "Net Profit", fmtMoney(data.netProfit), textColor, family);
-    addLabelValue(col2, "Est. Tax", fmtMoney(data.totalTax), amberColor, family);
+
+    row.addSpacer();
+
+    const col3 = row.addStack();
+    col3.layoutVertically();
+    addLabelValue(col3, "Est. Tax", fmtMoney(data.totalTax), amberColor, family);
 
     w.addSpacer(10);
     const banner = w.addText(
@@ -165,7 +164,7 @@ function addLabelValue(container, label, value, valueColor, family, big) {
 let widget;
 try {
   const data = await fetchSummary();
-  const family = config.widgetFamily || "medium"; // default when running in-app preview
+  const family = config.widgetFamily || "medium";
   widget = buildWidget(data, family);
 } catch (err) {
   widget = buildErrorWidget(err.message || "Could not load data");
@@ -174,7 +173,6 @@ try {
 if (config.runsInWidget) {
   Script.setWidget(widget);
 } else {
-  // Preview in-app when running the script manually
   await widget.presentMedium();
 }
 Script.complete();
