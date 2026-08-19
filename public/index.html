@@ -12,9 +12,9 @@
     --border: #e2ddd3;
   }
   [data-theme="dark"] {
-    --accent: #4a9eff; --red: #e0685a; --amber: #d4a13d;
-    --bg: #1b1b1a; --card: #262524; --text: #ecebe8; --muted: #9a9892;
-    --border: #3a3936;
+    --accent: #4a90e2; --red: #d16b5c; --amber: #d4a13d;
+    --bg: #121212; --card: #1c1c1c; --text: #f0f0f0; --muted: #9a9a9a;
+    --border: #333333;
   }
   * { box-sizing: border-box; }
   body {
@@ -81,8 +81,8 @@
   }
   .banner-yes { background: #fdecea; color: var(--red); }
   .banner-no { background: #e9f7ef; color: var(--accent); }
-  [data-theme="dark"] .banner-yes { background: #3a2422; }
-  [data-theme="dark"] .banner-no { background: #1e3a4d; }
+  [data-theme="dark"] .banner-yes { background: rgba(209,107,92,0.15); }
+  [data-theme="dark"] .banner-no { background: rgba(74,144,226,0.15); }
 
   .info-note {
     margin-top: 10px; font-size: 12px; color: var(--muted); font-style: italic;
@@ -111,11 +111,11 @@
   th { color: var(--muted); font-weight: 500; font-size: 11px; text-transform: uppercase; }
   .tag { padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 600; }
   .tag-income { background: #e9f7ef; color: var(--accent); }
-  [data-theme="dark"] .tag-income { background: #1e3a4d; }
-  [data-theme="dark"] .tag-expense { background: #3a2422; }
+  [data-theme="dark"] .tag-income { background: rgba(74,144,226,0.18); }
+  [data-theme="dark"] .tag-expense { background: rgba(209,107,92,0.18); }
   .tag-expense { background: #fdecea; color: var(--red); }
   .tag-mileage { background: #eaf1fb; color: #2a5fa8; }
-  [data-theme="dark"] .tag-mileage { background: #1e3a4d; color: #7fb8f0; }
+  [data-theme="dark"] .tag-mileage { background: rgba(74,144,226,0.18); color: #8fc0ff; }
   .job-pill {
     display: inline-block; padding: 1px 7px; border-radius: 20px; font-size: 10px;
     background: var(--bg); color: var(--muted); margin-left: 6px;
