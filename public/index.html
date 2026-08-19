@@ -12,7 +12,7 @@
     --border: #e2ddd3;
   }
   [data-theme="dark"] {
-    --accent: #3fb37f; --red: #e0685a; --amber: #d4a13d;
+    --accent: #4a9eff; --red: #e0685a; --amber: #d4a13d;
     --bg: #1b1b1a; --card: #262524; --text: #ecebe8; --muted: #9a9892;
     --border: #3a3936;
   }
@@ -81,6 +81,8 @@
   }
   .banner-yes { background: #fdecea; color: var(--red); }
   .banner-no { background: #e9f7ef; color: var(--accent); }
+  [data-theme="dark"] .banner-yes { background: #3a2422; }
+  [data-theme="dark"] .banner-no { background: #1e3a4d; }
 
   .info-note {
     margin-top: 10px; font-size: 12px; color: var(--muted); font-style: italic;
@@ -109,8 +111,11 @@
   th { color: var(--muted); font-weight: 500; font-size: 11px; text-transform: uppercase; }
   .tag { padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 600; }
   .tag-income { background: #e9f7ef; color: var(--accent); }
+  [data-theme="dark"] .tag-income { background: #1e3a4d; }
+  [data-theme="dark"] .tag-expense { background: #3a2422; }
   .tag-expense { background: #fdecea; color: var(--red); }
   .tag-mileage { background: #eaf1fb; color: #2a5fa8; }
+  [data-theme="dark"] .tag-mileage { background: #1e3a4d; color: #7fb8f0; }
   .job-pill {
     display: inline-block; padding: 1px 7px; border-radius: 20px; font-size: 10px;
     background: var(--bg); color: var(--muted); margin-left: 6px;
@@ -128,7 +133,7 @@
 <body>
 <div class="wrap">
   <header>
-    <h1 id="pageTitle">🐾 Side Job Tracker</h1>
+    <h1 id="pageTitle">🧾 Side Job Tracker</h1>
     <div class="header-actions">
       <button id="themeToggle" title="Toggle light/dark mode">🌙</button>
       <button id="logoutBtn">Log out</button>
@@ -278,7 +283,7 @@ async function loadJobs() {
   const res = await fetch('/api/jobs');
   jobs = await res.json();
   if (currentJobId === null) {
-    currentJobId = 'all'; // default to combined view on first load
+    currentJobId = 'all';
   }
   renderTabs();
 }
