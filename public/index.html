@@ -89,6 +89,9 @@
   }
 
   form.entry-form { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  @media (max-width: 480px) {
+    form.entry-form { grid-template-columns: 1fr; }
+  }
   form.entry-form label { font-size: 12px; color: var(--muted); display: block; margin-bottom: 4px; }
   form.entry-form input, form.entry-form select {
     width: 100%; padding: 9px 10px; border: 1px solid var(--border);
@@ -109,6 +112,29 @@
   table { width: 100%; border-collapse: collapse; font-size: 13px; }
   th, td { text-align: left; padding: 9px 8px; border-bottom: 1px solid var(--border); }
   th { color: var(--muted); font-weight: 500; font-size: 11px; text-transform: uppercase; }
+
+  @media (max-width: 640px) {
+    table, thead, tbody, tr, td { display: block; width: 100%; }
+    thead { display: none; }
+    tbody tr {
+      border: 1px solid var(--border); border-radius: 10px;
+      margin-bottom: 10px; padding: 10px 12px; position: relative;
+    }
+    tbody td {
+      border: none; padding: 4px 0; display: flex; justify-content: space-between;
+      align-items: center; gap: 10px;
+    }
+    tbody td::before {
+      content: attr(data-label); font-size: 10px; text-transform: uppercase;
+      letter-spacing: 0.04em; color: var(--muted); flex-shrink: 0;
+    }
+    tbody td:first-child { font-weight: 600; }
+    tbody td:first-child::before { content: ''; }
+    tbody td:last-child {
+      position: absolute; top: 8px; right: 10px; padding: 0; width: auto;
+    }
+    tbody td:last-child::before { content: ''; }
+  }
   .tag { padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 600; }
   .tag-income { background: #e9f7ef; color: var(--accent); }
   [data-theme="dark"] .tag-income { background: rgba(74,144,226,0.18); }
@@ -383,12 +409,12 @@ async function loadEntries() {
   const tbody = document.getElementById('entriesBody');
   tbody.innerHTML = entries.map(e => `
     <tr>
-      <td>${e.entry_date}</td>
-      <td><span class="tag tag-${e.type}">${e.type}</span>${currentJobId === 'all' ? `<span class="job-pill">${jobMap[e.job_id] || ''}</span>` : ''}</td>
-      <td>${e.description || ''}${e.category ? ' <span style="color:#999;">· ' + e.category + '</span>' : ''}</td>
-      <td>${e.type === 'mileage' ? fmtMoney(e.miles * currentMileageRate) : fmtMoney(e.amount)}</td>
-      <td>${e.type === 'mileage' ? e.miles : '—'}</td>
-      <td>${e.receipt_path ? `<a class="receipt-link" href="${e.receipt_path}" target="_blank">View</a>` : ''}</td>
+      <td data-label="Date">${e.entry_date}</td>
+      <td data-label="Type"><span class="tag tag-${e.type}">${e.type}</span>${currentJobId === 'all' ? `<span class="job-pill">${jobMap[e.job_id] || ''}</span>` : ''}</td>
+      <td data-label="Description">${e.description || ''}${e.category ? ' <span style="color:#999;">· ' + e.category + '</span>' : ''}</td>
+      <td data-label="Amount">${e.type === 'mileage' ? fmtMoney(e.miles * currentMileageRate) : fmtMoney(e.amount)}</td>
+      <td data-label="Miles">${e.type === 'mileage' ? e.miles : '—'}</td>
+      <td data-label="Receipt">${e.receipt_path ? `<a class="receipt-link" href="${e.receipt_path}" target="_blank">View</a>` : ''}</td>
       <td><button class="del-btn" onclick="deleteEntry(${e.id})">✕</button></td>
     </tr>
   `).join('');
